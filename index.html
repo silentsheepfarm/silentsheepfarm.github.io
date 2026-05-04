@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiro AI Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; padding: 24px; }
+    h1 { font-size: 1.4rem; margin-bottom: 6px; color: #fff; }
+    .subtitle { font-size: 0.8rem; color: #64748b; margin-bottom: 20px; }
+    h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .08em; color: #475569; margin: 24px 0 12px; border-top: 1px solid #1e2235; padding-top: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+    .card { background: #1a1d27; border-radius: 10px; padding: 18px; border: 1px solid #2d3148; }
+    .card h2 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 12px; }
+    .badge { display: inline-block; font-size: 0.68rem; padding: 2px 7px; border-radius: 99px; margin-left: 6px; vertical-align: middle; }
+    .aws { background: #ff9900; color: #000; }
+    .dt  { background: #1496ff; color: #fff; }
+    .error-msg { font-size: 0.78rem; color: #f87171; margin-top: 6px; min-height: 1.1em; }
+    canvas { max-height: 160px; }
+    .refresh { font-size: 0.73rem; color: #64748b; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <h1>☁️ Kiro AI Observability Dashboard</h1>
+  <p class="subtitle">Host: ip-172-31-44-160.ec2.internal &nbsp;·&nbsp; Region: ap-south-1</p>
+
+  <div style="margin-bottom:20px">
+    <label style="font-size:0.8rem;color:#94a3b8;margin-right:8px;">Time Range:</label>
+    <select id="timeRange" onchange="refresh()" style="background:#1a1d27;color:#e2e8f0;border:1px solid #2d3148;border-radius:6px;padding:4px 10px;font-size:0.8rem;cursor:pointer">
+      <option value="1">Last 1 hour</option>
+      <option value="3" selected>Last 3 hours</option>
+      <option value="6">Last 6 hours</option>
+      <option value="12">Last 12 hours</option>
+      <option value="24">Last 24 hours</option>
+      <option value="48">Last 48 hours</option>
+      <option value="72">Last 72 hours</option>
+    </select>
+  </div>
+
+  <h3>EC2 — CloudWatch</h3>
+  <div class="grid">
+    <div class="card">
+      <h2>CPU Utilization % <span class="badge aws">EC2</span></h2>
+      <canvas id="ec2Cpu"></canvas><div id="ec2CpuErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Network In (bytes) <span class="badge aws">EC2</span></h2>
+      <canvas id="ec2NetIn"></canvas><div id="ec2NetInErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Network Out (bytes) <span class="badge aws">EC2</span></h2>
+      <canvas id="ec2NetOut"></canvas><div id="ec2NetOutErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Disk Read (bytes) <span class="badge aws">EC2</span></h2>
+      <canvas id="ec2DiskR"></canvas><div id="ec2DiskRErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Disk Write (bytes) <span class="badge aws">EC2</span></h2>
+      <canvas id="ec2DiskW"></canvas><div id="ec2DiskWErr" class="error-msg"></div>
+    </div>
+  </div>
+
+  <h3>SES — CloudWatch</h3>
+  <div class="grid">
+    <div class="card">
+      <h2>Sends <span class="badge aws">SES</span></h2>
+      <canvas id="sesSend"></canvas><div id="sesSendErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Deliveries <span class="badge aws">SES</span></h2>
+      <canvas id="sesDel"></canvas><div id="sesDelErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Bounces <span class="badge aws">SES</span></h2>
+      <canvas id="sesBounce"></canvas><div id="sesBounceErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Complaints <span class="badge aws">SES</span></h2>
+      <canvas id="sesComp"></canvas><div id="sesCompErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Rejects <span class="badge aws">SES</span></h2>
+      <canvas id="sesRej"></canvas><div id="sesRejErr" class="error-msg"></div>
+    </div>
+  </div>
+
+  <h3>EC2 — Additional</h3>
+  <div class="grid">
+    <div class="card"><h2>Status Check Failed <span class="badge aws">EC2</span></h2><canvas id="ec2Status"></canvas><div id="ec2StatusErr" class="error-msg"></div></div>
+    <div class="card"><h2>CPU Credit Balance <span class="badge aws">EC2</span></h2><canvas id="ec2Credit"></canvas><div id="ec2CreditErr" class="error-msg"></div></div>
+    <div class="card"><h2>Network Packets In <span class="badge aws">EC2</span></h2><canvas id="ec2PktIn"></canvas><div id="ec2PktInErr" class="error-msg"></div></div>
+    <div class="card"><h2>Network Packets Out <span class="badge aws">EC2</span></h2><canvas id="ec2PktOut"></canvas><div id="ec2PktOutErr" class="error-msg"></div></div>
+    <div class="card"><h2>EBS Read Ops <span class="badge aws">EC2</span></h2><canvas id="ec2EbsR"></canvas><div id="ec2EbsRErr" class="error-msg"></div></div>
+    <div class="card"><h2>EBS Write Ops <span class="badge aws">EC2</span></h2><canvas id="ec2EbsW"></canvas><div id="ec2EbsWErr" class="error-msg"></div></div>
+  </div>
+
+  <h3>EBS — CloudWatch</h3>
+  <div class="grid">
+    <div class="card"><h2>Read Bytes <span class="badge aws">EBS</span></h2><canvas id="ebsRB"></canvas><div id="ebsRBErr" class="error-msg"></div></div>
+    <div class="card"><h2>Write Bytes <span class="badge aws">EBS</span></h2><canvas id="ebsWB"></canvas><div id="ebsWBErr" class="error-msg"></div></div>
+    <div class="card"><h2>Avg Read Latency <span class="badge aws">EBS</span></h2><canvas id="ebsRL"></canvas><div id="ebsRLErr" class="error-msg"></div></div>
+    <div class="card"><h2>Avg Write Latency <span class="badge aws">EBS</span></h2><canvas id="ebsWL"></canvas><div id="ebsWLErr" class="error-msg"></div></div>
+    <div class="card"><h2>Queue Length <span class="badge aws">EBS</span></h2><canvas id="ebsQL"></canvas><div id="ebsQLErr" class="error-msg"></div></div>
+    <div class="card"><h2>Avg IOPS <span class="badge aws">EBS</span></h2><canvas id="ebsIOPS"></canvas><div id="ebsIOPSErr" class="error-msg"></div></div>
+  </div>
+
+  <h3>Bedrock Data Automation — CloudWatch</h3>
+  <div class="grid">
+    <div class="card"><h2>Invocations <span class="badge aws">Bedrock</span></h2><canvas id="brkInv"></canvas><div id="brkInvErr" class="error-msg"></div></div>
+    <div class="card"><h2>Invocation Latency <span class="badge aws">Bedrock</span></h2><canvas id="brkLat"></canvas><div id="brkLatErr" class="error-msg"></div></div>
+    <div class="card"><h2>Client Errors <span class="badge aws">Bedrock</span></h2><canvas id="brkCE"></canvas><div id="brkCEErr" class="error-msg"></div></div>
+    <div class="card"><h2>Server Errors <span class="badge aws">Bedrock</span></h2><canvas id="brkSE"></canvas><div id="brkSEErr" class="error-msg"></div></div>
+  </div>
+
+  <h3>Rekognition — CloudWatch</h3>
+  <div class="grid">
+    <div class="card"><h2>Successful Requests <span class="badge aws">Rekognition</span></h2><canvas id="rekReq"></canvas><div id="rekReqErr" class="error-msg"></div></div>
+    <div class="card"><h2>Response Time <span class="badge aws">Rekognition</span></h2><canvas id="rekLat"></canvas><div id="rekLatErr" class="error-msg"></div></div>
+  </div>
+
+  <h3>Step Functions — CloudWatch</h3>
+  <div class="grid">
+    <div class="card"><h2>Consumed Capacity <span class="badge aws">Step Functions</span></h2><canvas id="sfnCap"></canvas><div id="sfnCapErr" class="error-msg"></div></div>
+    <div class="card"><h2>Throttled Events <span class="badge aws">Step Functions</span></h2><canvas id="sfnThr"></canvas><div id="sfnThrErr" class="error-msg"></div></div>
+  </div>
+
+  <h3>Dynatrace — Host Metrics (ip-172-31-44-160)</h3>
+  <div class="grid">
+    <div class="card">
+      <h2>CPU Usage % <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtCpu"></canvas><div id="dtCpuErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Memory Usage % <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtMem"></canvas><div id="dtMemErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Disk Used % <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtDisk"></canvas><div id="dtDiskErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Network In (bytes/s) <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtNetIn"></canvas><div id="dtNetInErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Network Out (bytes/s) <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtNetOut"></canvas><div id="dtNetOutErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Disk Read Ops/s <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtDiskR"></canvas><div id="dtDiskRErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Disk Write Ops/s <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtDiskW"></canvas><div id="dtDiskWErr" class="error-msg"></div>
+    </div>
+    <div class="card">
+      <h2>Service Response Time <span class="badge dt">Dynatrace</span></h2>
+      <canvas id="dtResp"></canvas><div id="dtRespErr" class="error-msg"></div>
+    </div>
+  </div>
+
+  <p class="refresh">Auto-refreshes every 30s &nbsp;·&nbsp; Last update: <span id="lastUpdate">—</span> &nbsp;·&nbsp;
+    <button id="sendBtn" onclick="sendReport()" style="background:#1496ff;color:#fff;border:none;padding:4px 14px;border-radius:6px;cursor:pointer;font-size:0.78rem;">✉ Send Report</button>
+    <span id="sendStatus" style="font-size:0.78rem;margin-left:8px;"></span>
+  </p>
+
+<script>
+const AWS = { border: "#ff9900", bg: "rgba(255,153,0,0.15)" };
+const DT  = { border: "#1496ff", bg: "rgba(20,150,255,0.15)" };
+
+function makeChart(id, color) {
+  return new Chart(document.getElementById(id), {
+    type: "line",
+    data: { labels: [], datasets: [{ data: [], borderColor: color.border, backgroundColor: color.bg, borderWidth: 2, pointRadius: 2, fill: true, tension: 0.3 }] },
+    options: {
+      animation: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#64748b", maxTicksLimit: 6 }, grid: { color: "#1e2235" } },
+        y: { beginAtZero: true, ticks: { color: "#64748b" }, grid: { color: "#1e2235" } },
+      },
+    },
+  });
+}
+
+const CHARTS = [
+  ["/api/ec2-cpu",          "ec2Cpu",   AWS],
+  ["/api/ec2-network-in",   "ec2NetIn", AWS],
+  ["/api/ec2-network-out",  "ec2NetOut",AWS],
+  ["/api/ec2-disk-read",    "ec2DiskR", AWS],
+  ["/api/ec2-disk-write",   "ec2DiskW", AWS],
+  ["/api/ec2-status",       "ec2Status",AWS],
+  ["/api/ec2-cpu-credit",   "ec2Credit",AWS],
+  ["/api/ec2-packets-in",   "ec2PktIn", AWS],
+  ["/api/ec2-packets-out",  "ec2PktOut",AWS],
+  ["/api/ec2-ebs-read-ops", "ec2EbsR",  AWS],
+  ["/api/ec2-ebs-write-ops","ec2EbsW",  AWS],
+  ["/api/ses-sends",        "sesSend",  AWS],
+  ["/api/ses-deliveries",   "sesDel",   AWS],
+  ["/api/ses-bounces",      "sesBounce",AWS],
+  ["/api/ses-complaints",   "sesComp",  AWS],
+  ["/api/ses-rejects",      "sesRej",   AWS],
+  ["/api/ebs-read-bytes",   "ebsRB",    AWS],
+  ["/api/ebs-write-bytes",  "ebsWB",    AWS],
+  ["/api/ebs-read-latency", "ebsRL",    AWS],
+  ["/api/ebs-write-latency","ebsWL",    AWS],
+  ["/api/ebs-queue-length", "ebsQL",    AWS],
+  ["/api/ebs-iops",         "ebsIOPS",  AWS],
+  ["/api/bedrock-invocations",   "brkInv", AWS],
+  ["/api/bedrock-latency",       "brkLat", AWS],
+  ["/api/bedrock-client-errors", "brkCE",  AWS],
+  ["/api/bedrock-server-errors", "brkSE",  AWS],
+  ["/api/rekognition-requests",  "rekReq", AWS],
+  ["/api/rekognition-latency",   "rekLat", AWS],
+  ["/api/sfn-capacity",   "sfnCap", AWS],
+  ["/api/sfn-throttled",  "sfnThr", AWS],
+  ["/api/dt-host-cpu",      "dtCpu",    DT],
+  ["/api/dt-host-mem",      "dtMem",    DT],
+  ["/api/dt-host-disk",     "dtDisk",   DT],
+  ["/api/dt-host-net-in",   "dtNetIn",  DT],
+  ["/api/dt-host-net-out",  "dtNetOut", DT],
+  ["/api/dt-host-disk-read","dtDiskR",  DT],
+  ["/api/dt-host-disk-write","dtDiskW", DT],
+  ["/api/dt-response-time", "dtResp",   DT],
+].map(([url, id, color]) => ({ url, chart: makeChart(id, color), err: document.getElementById(id + "Err") }));
+
+async function load({ url, chart, err }) {
+  const hours = document.getElementById("timeRange").value;
+  try {
+    const d = await fetch(`${url}?hours=${hours}`).then(r => r.json());
+    err.textContent = d.ok ? "" : `⚠ ${d.error}`;
+    if (d.ok) { chart.data.labels = d.labels; chart.data.datasets[0].data = d.values; chart.update(); }
+  } catch (e) { err.textContent = "⚠ Connection error"; }
+}
+
+function refresh() {
+  CHARTS.forEach(load);
+  document.getElementById("lastUpdate").textContent = new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 30000);
+
+async function sendReport() {
+  const btn = document.getElementById("sendBtn");
+  const status = document.getElementById("sendStatus");
+  btn.disabled = true;
+  status.textContent = "Sending…";
+  try {
+    const d = await fetch("/api/send-report", { method: "POST" }).then(r => r.json());
+    status.style.color = d.ok ? "#4ade80" : "#f87171";
+    status.textContent = d.ok ? "✓ Sent!" : `⚠ ${d.error}`;
+  } catch (e) {
+    status.style.color = "#f87171";
+    status.textContent = "⚠ Connection error";
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
